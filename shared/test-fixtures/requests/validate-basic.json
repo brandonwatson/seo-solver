@@ -1,0 +1,5 @@
+{
+  "$schema": "../../../shared/schemas/validation-request.json",
+  "_description": "Basic validation request with minimal parameters",
+  "site_url": "https://www.example.com"
+}

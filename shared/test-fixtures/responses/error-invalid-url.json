@@ -1,0 +1,12 @@
+{
+  "_description": "Error response for invalid site_url",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid site_url format",
+    "details": {
+      "field": "site_url",
+      "reason": "Must be a valid HTTPS URL",
+      "provided": "not-a-valid-url"
+    }
+  }
+}

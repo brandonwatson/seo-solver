@@ -1,0 +1,22 @@
+{
+  "$schema": "../../../shared/schemas/validation-response.json",
+  "_description": "Successful validation with no issues found",
+  "validation_id": "val_success123",
+  "status": "completed",
+  "site_url": "https://www.example.com",
+  "urls_checked": 5,
+  "started_at": "2025-01-04T10:00:00Z",
+  "completed_at": "2025-01-04T10:00:08Z",
+  "summary": {
+    "total_issues": 0,
+    "errors": 0,
+    "warnings": 0,
+    "by_category": {
+      "structured_data": 0,
+      "indexing": 0,
+      "performance": 0,
+      "mobile": 0
+    }
+  },
+  "issues": []
+}

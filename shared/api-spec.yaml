@@ -1,0 +1,845 @@
+openapi: 3.0.3
+info:
+  title: SEO Solver API
+  description: |
+    Open-source SEO validation service that detects, tracks, and suggests fixes for SEO issues.
+
+    All implementations must conform to this API specification to ensure compatibility
+    with the Claude Code skill and any client.
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://{api-id}.execute-api.{region}.amazonaws.com/{stage}
+    description: AWS API Gateway
+    variables:
+      api-id:
+        default: abc123
+        description: API Gateway ID
+      region:
+        default: us-east-1
+        description: AWS Region
+      stage:
+        default: dev
+        description: Deployment stage
+  - url: https://seo-solver.{subdomain}.workers.dev
+    description: Cloudflare Workers
+    variables:
+      subdomain:
+        default: example
+        description: Your Cloudflare subdomain
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Validation
+    description: Run SEO validation on sites
+  - name: Issues
+    description: Manage detected SEO issues
+  - name: Sites
+    description: Register and manage sites for monitoring
+  - name: Health
+    description: Service health and status
+
+paths:
+  /validate:
+    post:
+      tags:
+        - Validation
+      summary: Run SEO validation on a site
+      description: |
+        Validates a site for SEO issues including structured data, indexing, performance, and mobile.
+
+        For sites with fewer than 10 URLs, validation is synchronous and returns results immediately.
+        For larger sites, validation is asynchronous and results are posted to the callback URL.
+      operationId: validateSite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRequest'
+            examples:
+              basic:
+                summary: Basic validation
+                value:
+                  site_url: "https://www.example.com"
+              full:
+                summary: Full validation with all options
+                value:
+                  site_url: "https://www.example.com"
+                  sitemap_url: "https://www.example.com/sitemap.xml"
+                  gsc_property: "sc-domain:example.com"
+                  checks:
+                    - structured_data
+                    - indexing
+                    - performance
+                    - mobile
+                  max_urls: 100
+                  callback_url: "https://webhook.example.com/seo-results"
+      responses:
+        '200':
+          description: Validation completed (sync) or started (async)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+              examples:
+                sync_completed:
+                  summary: Synchronous completion (< 10 URLs)
+                  value:
+                    validation_id: "val_abc123"
+                    status: "completed"
+                    site_url: "https://www.example.com"
+                    urls_checked: 8
+                    started_at: "2025-01-04T10:00:00Z"
+                    completed_at: "2025-01-04T10:00:15Z"
+                    summary:
+                      total_issues: 5
+                      errors: 2
+                      warnings: 3
+                      by_category:
+                        structured_data: 3
+                        indexing: 1
+                        performance: 1
+                        mobile: 0
+                    issues:
+                      - id: "iss_xyz789"
+                        url: "https://www.example.com/page"
+                        category: "structured_data"
+                        type: "missing_required_field"
+                        severity: "error"
+                        details:
+                          schema_type: "VideoObject"
+                          field: "uploadDate"
+                          message: "Required field 'uploadDate' is missing from VideoObject schema"
+                        auto_fixable: true
+                        suggested_fix: "Add 'uploadDate' field with ISO 8601 date format (e.g., '2025-01-04T00:00:00Z')"
+                        detected_at: "2025-01-04T10:00:12Z"
+                async_processing:
+                  summary: Asynchronous processing (>= 10 URLs)
+                  value:
+                    validation_id: "val_abc123"
+                    status: "processing"
+                    site_url: "https://www.example.com"
+                    urls_to_check: 100
+                    started_at: "2025-01-04T10:00:00Z"
+                    estimated_completion: "2025-01-04T10:05:00Z"
+                    callback_url: "https://webhook.example.com/seo-results"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sites/{site_id}/issues:
+    get:
+      tags:
+        - Issues
+      summary: Get all issues for a site
+      description: Retrieves all SEO issues detected for a registered site with optional filtering.
+      operationId: getIssuesBySite
+      parameters:
+        - name: site_id
+          in: path
+          required: true
+          description: Domain of the site (e.g., `example.com`)
+          schema:
+            type: string
+            example: "example.com"
+        - name: status
+          in: query
+          description: Filter by issue status
+          schema:
+            $ref: '#/components/schemas/IssueStatus'
+        - name: category
+          in: query
+          description: Filter by issue category
+          schema:
+            $ref: '#/components/schemas/IssueCategory'
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            $ref: '#/components/schemas/IssueSeverity'
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: cursor
+          in: query
+          description: Pagination cursor from previous response
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /issues/{issue_id}:
+    patch:
+      tags:
+        - Issues
+      summary: Update an issue's status
+      description: Update the status of a specific issue (e.g., mark as fixed).
+      operationId: updateIssue
+      parameters:
+        - name: issue_id
+          in: path
+          required: true
+          description: Issue ID (e.g., `iss_xyz789`)
+          schema:
+            type: string
+            pattern: '^iss_[a-zA-Z0-9]+$'
+            example: "iss_xyz789"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueUpdateRequest'
+      responses:
+        '200':
+          description: Issue updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueUpdateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sites:
+    post:
+      tags:
+        - Sites
+      summary: Register a site for monitoring
+      description: Register a new site for scheduled SEO validation and monitoring.
+      operationId: registerSite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRegistrationRequest'
+      responses:
+        '201':
+          description: Site registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteRegistrationResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      tags:
+        - Sites
+      summary: List all registered sites
+      description: Retrieve all sites registered for monitoring.
+      operationId: listSites
+      responses:
+        '200':
+          description: List of registered sites
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns service health status, version, and implementation name.
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unhealthy or degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "unhealthy"
+                version: "1.0.0"
+                implementation: "aws-typescript"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    # Request Schemas
+    ValidationRequest:
+      type: object
+      required:
+        - site_url
+      properties:
+        site_url:
+          type: string
+          format: uri
+          description: Base URL of site to validate
+          example: "https://www.example.com"
+        sitemap_url:
+          type: string
+          format: uri
+          description: Sitemap URL (auto-detected if not provided)
+          example: "https://www.example.com/sitemap.xml"
+        gsc_property:
+          type: string
+          description: GSC property ID for URL Inspection API
+          example: "sc-domain:example.com"
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssueCategory'
+          description: "Which validators to run (default: all)"
+          default:
+            - structured_data
+            - indexing
+            - performance
+            - mobile
+        max_urls:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 50
+          description: Maximum URLs to validate
+        callback_url:
+          type: string
+          format: uri
+          description: Webhook URL for async results
+
+    SiteRegistrationRequest:
+      type: object
+      required:
+        - site_url
+      properties:
+        site_url:
+          type: string
+          format: uri
+          description: Base URL of site
+          example: "https://www.example.com"
+        sitemap_url:
+          type: string
+          format: uri
+          description: Sitemap URL
+          example: "https://www.example.com/sitemap.xml"
+        gsc_property:
+          type: string
+          description: GSC property for API access
+          example: "sc-domain:example.com"
+        check_schedule:
+          $ref: '#/components/schemas/CheckSchedule'
+        notification_webhook:
+          type: string
+          format: uri
+          description: Webhook for new issue alerts
+        notification_email:
+          type: string
+          format: email
+          description: Email for new issue alerts
+
+    IssueUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+
+    # Response Schemas
+    ValidationResponse:
+      type: object
+      required:
+        - validation_id
+        - status
+        - site_url
+        - started_at
+      properties:
+        validation_id:
+          type: string
+          pattern: '^val_[a-zA-Z0-9]+$'
+          description: Unique validation ID
+          example: "val_abc123"
+        status:
+          $ref: '#/components/schemas/ValidationStatus'
+        site_url:
+          type: string
+          format: uri
+          description: Site that was validated
+        urls_checked:
+          type: integer
+          description: Number of URLs checked (sync response)
+        urls_to_check:
+          type: integer
+          description: Number of URLs to check (async response)
+        started_at:
+          type: string
+          format: date-time
+          description: When validation started
+        completed_at:
+          type: string
+          format: date-time
+          description: When validation completed (sync response)
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated completion time (async response)
+        callback_url:
+          type: string
+          format: uri
+          description: Webhook URL for results (async response)
+        summary:
+          $ref: '#/components/schemas/ValidationSummary'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: Detected issues (sync response)
+
+    ValidationSummary:
+      type: object
+      required:
+        - total_issues
+        - errors
+        - warnings
+        - by_category
+      properties:
+        total_issues:
+          type: integer
+          minimum: 0
+        errors:
+          type: integer
+          minimum: 0
+        warnings:
+          type: integer
+          minimum: 0
+        by_category:
+          type: object
+          properties:
+            structured_data:
+              type: integer
+              minimum: 0
+            indexing:
+              type: integer
+              minimum: 0
+            performance:
+              type: integer
+              minimum: 0
+            mobile:
+              type: integer
+              minimum: 0
+
+    Issue:
+      type: object
+      required:
+        - id
+        - url
+        - category
+        - type
+        - severity
+        - auto_fixable
+        - detected_at
+      properties:
+        id:
+          type: string
+          pattern: '^iss_[a-zA-Z0-9]+$'
+          description: Unique issue ID
+          example: "iss_xyz789"
+        url:
+          type: string
+          format: uri
+          description: URL where issue was detected
+        category:
+          $ref: '#/components/schemas/IssueCategory'
+        type:
+          $ref: '#/components/schemas/IssueType'
+        severity:
+          $ref: '#/components/schemas/IssueSeverity'
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+        details:
+          $ref: '#/components/schemas/IssueDetails'
+        auto_fixable:
+          type: boolean
+          description: Whether the issue can be auto-fixed
+        suggested_fix:
+          type: string
+          description: Suggested fix for the issue
+        detected_at:
+          type: string
+          format: date-time
+          description: When the issue was first detected
+        updated_at:
+          type: string
+          format: date-time
+          description: When the issue was last updated
+
+    IssueDetails:
+      type: object
+      description: Additional details about the issue (varies by type)
+      properties:
+        schema_type:
+          type: string
+          description: Schema.org type (for structured data issues)
+        field:
+          type: string
+          description: Field name (for structured data issues)
+        message:
+          type: string
+          description: Human-readable error message
+        expected:
+          type: string
+          description: Expected value or format
+        actual:
+          type: string
+          description: Actual value found
+        threshold:
+          type: number
+          description: Threshold value (for performance issues)
+        value:
+          type: number
+          description: Measured value (for performance issues)
+      additionalProperties: true
+
+    IssueListResponse:
+      type: object
+      required:
+        - site_id
+        - total_issues
+        - returned
+        - issues
+      properties:
+        site_id:
+          type: string
+          description: Domain of the site
+        total_issues:
+          type: integer
+          minimum: 0
+          description: Total number of matching issues
+        returned:
+          type: integer
+          minimum: 0
+          description: Number of issues returned in this response
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for next page (null if no more results)
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+
+    IssueUpdateResponse:
+      type: object
+      required:
+        - id
+        - status
+        - updated_at
+      properties:
+        id:
+          type: string
+          pattern: '^iss_[a-zA-Z0-9]+$'
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+        updated_at:
+          type: string
+          format: date-time
+
+    SiteRegistrationResponse:
+      type: object
+      required:
+        - site_id
+        - site_url
+        - check_schedule
+        - created_at
+      properties:
+        site_id:
+          type: string
+          description: Domain of the site (used as ID)
+          example: "example.com"
+        site_url:
+          type: string
+          format: uri
+        check_schedule:
+          $ref: '#/components/schemas/CheckSchedule'
+        next_check:
+          type: string
+          format: date-time
+          description: Next scheduled check time
+        created_at:
+          type: string
+          format: date-time
+
+    SiteListResponse:
+      type: object
+      required:
+        - sites
+      properties:
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Site'
+
+    Site:
+      type: object
+      required:
+        - site_id
+        - site_url
+        - check_schedule
+      properties:
+        site_id:
+          type: string
+          example: "example.com"
+        site_url:
+          type: string
+          format: uri
+        check_schedule:
+          $ref: '#/components/schemas/CheckSchedule'
+        last_check:
+          type: string
+          format: date-time
+          nullable: true
+        next_check:
+          type: string
+          format: date-time
+        open_issues:
+          type: integer
+          minimum: 0
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - implementation
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          example: "healthy"
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          example: "1.0.0"
+        implementation:
+          type: string
+          description: Implementation identifier
+          example: "aws-typescript"
+
+    # Error Schema
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: object
+              description: Additional error details
+              additionalProperties: true
+
+    # Enums
+    ValidationStatus:
+      type: string
+      enum:
+        - processing
+        - completed
+        - failed
+      description: Status of the validation
+
+    IssueCategory:
+      type: string
+      enum:
+        - structured_data
+        - indexing
+        - performance
+        - mobile
+      description: Category of SEO issue
+
+    IssueType:
+      type: string
+      enum:
+        # Structured Data
+        - missing_required_field
+        - missing_recommended_field
+        - invalid_field_value
+        - invalid_field_type
+        - missing_schema
+        - syntax_error
+        - duplicate_schema
+        # Indexing
+        - duplicate_without_canonical
+        - conflicting_canonical
+        - crawled_not_indexed
+        - discovered_not_indexed
+        - blocked_by_robots
+        - noindex_tag
+        - not_found_404
+        - server_error_5xx
+        - redirect_chain
+        - redirect_loop
+        # Performance
+        - poor_lcp
+        - needs_improvement_lcp
+        - poor_inp
+        - needs_improvement_inp
+        - poor_cls
+        - needs_improvement_cls
+        # Mobile
+        - no_viewport
+        - text_too_small
+        - tap_targets_too_close
+        - content_wider_than_screen
+      description: Specific type of issue
+
+    IssueSeverity:
+      type: string
+      enum:
+        - error
+        - warning
+      description: Severity level of the issue
+
+    IssueStatus:
+      type: string
+      enum:
+        - open
+        - fixing
+        - fixed
+        - wontfix
+      description: Current status of the issue
+
+    CheckSchedule:
+      type: string
+      enum:
+        - daily
+        - weekly
+        - manual
+      default: daily
+      description: How often to run scheduled checks
+
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_ERROR
+        - UNAUTHORIZED
+        - NOT_FOUND
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+      description: Error code for programmatic handling
+
+  responses:
+    ValidationError:
+      description: Invalid request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "Invalid site_url format"
+              details:
+                field: "site_url"
+                reason: "Must be a valid HTTPS URL"
+
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Invalid or missing API key"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Site not found"
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "RATE_LIMITED"
+              message: "Rate limit exceeded. Try again in 60 seconds."
+
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"

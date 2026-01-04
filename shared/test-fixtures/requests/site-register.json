@@ -1,0 +1,9 @@
+{
+  "_description": "Site registration request for scheduled monitoring",
+  "site_url": "https://www.example.com",
+  "sitemap_url": "https://www.example.com/sitemap.xml",
+  "gsc_property": "sc-domain:example.com",
+  "check_schedule": "daily",
+  "notification_webhook": "https://webhook.example.com/seo-alerts",
+  "notification_email": "alerts@example.com"
+}
