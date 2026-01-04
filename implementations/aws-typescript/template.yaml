@@ -14,6 +14,19 @@ Parameters:
     Default: ''
     NoEcho: true
     Description: Google PageSpeed Insights API key (optional)
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: Google OAuth2 Client ID for Search Console API
+  GoogleClientSecret:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Google OAuth2 Client Secret
+  GoogleRedirectUri:
+    Type: String
+    Default: ''
+    Description: Google OAuth2 Redirect URI
 
 Globals:
   Function:
@@ -27,7 +40,11 @@ Globals:
         STAGE: !Ref StageName
         SITES_TABLE: !Ref SitesTable
         ISSUES_TABLE: !Ref IssuesTable
+        TOKENS_TABLE: !Ref TokensTable
         PAGESPEED_API_KEY: !Ref PageSpeedApiKey
+        GOOGLE_CLIENT_ID: !Ref GoogleClientId
+        GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+        GOOGLE_REDIRECT_URI: !Ref GoogleRedirectUri
 
 Resources:
   # ============================================================
@@ -102,6 +119,25 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  TokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub seo-solver-tokens-${StageName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
   # ============================================================
   # Lambda Functions
   # ============================================================
@@ -129,6 +165,91 @@ Resources:
         EntryPoints:
           - src/handlers/health.ts
 
+  # Google OAuth Authentication
+  AuthGoogleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-auth-google-${StageName}
+      Handler: handlers/auth-google.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
+      Events:
+        AuthInitiateApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /auth/google
+            Method: GET
+        AuthCallbackApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /auth/google/callback
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/auth-google.ts
+
+  # GSC Properties Endpoint
+  GscPropertiesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-gsc-properties-${StageName}
+      Handler: handlers/gsc-properties.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
+      Events:
+        GscPropertiesApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /gsc/properties
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/gsc-properties.ts
+
+  # GSC URL Inspection Endpoint
+  GscInspectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-gsc-inspect-${StageName}
+      Handler: handlers/gsc-inspect.handler
+      CodeUri: ./
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
+      Events:
+        GscInspectApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /gsc/inspect
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/gsc-inspect.ts
+
   # Validate Endpoint
   ValidateFunction:
     Type: AWS::Serverless::Function
@@ -143,6 +264,8 @@ Resources:
             TableName: !Ref SitesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref IssuesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
       Events:
         ValidateApi:
           Type: HttpApi
@@ -269,6 +392,12 @@ Outputs:
   IssuesTableName:
     Description: DynamoDB Issues table name
     Value: !Ref IssuesTable
+  TokensTableName:
+    Description: DynamoDB Tokens table name
+    Value: !Ref TokensTable
   HealthEndpoint:
     Description: Health check endpoint
     Value: !Sub https://${SeoSolverApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/health
+  GoogleAuthEndpoint:
+    Description: Google OAuth initiate endpoint
+    Value: !Sub https://${SeoSolverApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/auth/google

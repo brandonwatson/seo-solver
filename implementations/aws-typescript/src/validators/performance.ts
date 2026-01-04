@@ -184,7 +184,11 @@ async function fetchPageSpeedMetrics(url: string): Promise<PageSpeedMetrics | nu
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      lighthouseResult?: {
+        audits?: Record<string, { numericValue?: number }>;
+      };
+    };
 
     // Extract metrics from the response
     const metrics: PageSpeedMetrics = {};
