@@ -343,7 +343,7 @@ After completing this workplan:
 ### Technical Notes and Learnings
 
 - **PIVOT:** Validators are now SECONDARY to Google Search Console API integration
-- See Workplan 2 for GSC integration as primary data source
+- See Workplan 1.5 for GSC integration as primary data source
 - Validators remain useful for:
   - Sites without GSC connected (e.g., askmylisting.com)
   - Proactive detection before Google catches issues
