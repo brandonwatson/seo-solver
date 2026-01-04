@@ -14,11 +14,14 @@ import {
   generateIssueId,
   extractSiteId,
   issueToRecord,
+  getGoogleToken,
 } from '../db/dynamodb';
 import { validateStructuredData } from '../validators/structured-data';
 import { validateIndexing } from '../validators/indexing';
 import { validatePerformance } from '../validators/performance';
 import { validateMobile } from '../validators/mobile';
+import { inspectUrl } from '../gsc/client';
+import { mapInspectionResultToIssues } from '../gsc/issues-mapper';
 
 const DEFAULT_CHECKS: IssueCategory[] = [
   'structured_data',
@@ -103,10 +106,13 @@ export async function handler(
     }
 
     const validationId = generateValidationId();
-    const siteId = extractSiteId(request.site_url);
+    const siteId = request.site_id || extractSiteId(request.site_url);
     const startedAt = new Date().toISOString();
 
-    // Run validators
+    // Check if GSC is available and requested
+    let gscUsed = false;
+    let gscPropertyUsed: string | undefined;
+
     const allIssues: Issue[] = [];
     let urlsChecked = 0;
 
@@ -114,40 +120,87 @@ export async function handler(
     // In a full implementation, we'd fetch sitemap and validate multiple URLs
     const urlsToValidate = [request.site_url];
 
-    for (const url of urlsToValidate.slice(0, maxUrls)) {
-      if (checks.includes('structured_data')) {
-        const result = await validateStructuredData(url);
-        allIssues.push(...result.issues.map(issue => ({
-          ...issue,
-          id: generateIssueId(),
-        })));
+    // If GSC is requested, check if we have tokens
+    const useGsc = request.use_gsc ?? true; // Default to using GSC if available
+    const tokenRecord = useGsc ? await getGoogleToken(siteId) : null;
+
+    if (tokenRecord && useGsc) {
+      // Use GSC URL Inspection API
+      const gscProperty = request.gsc_property || request.site_url;
+
+      for (const url of urlsToValidate.slice(0, maxUrls)) {
+        const result = await inspectUrl(siteId, {
+          inspectionUrl: url,
+          siteUrl: gscProperty,
+        });
+
+        if (result?.inspectionResult) {
+          gscUsed = true;
+          gscPropertyUsed = gscProperty;
+
+          // Map GSC results to our issue format
+          const gscIssues = mapInspectionResultToIssues(url, result.inspectionResult);
+
+          // Filter by requested checks and add IDs
+          for (const issue of gscIssues) {
+            if (checks.includes(issue.category)) {
+              allIssues.push({
+                ...issue,
+                id: generateIssueId(),
+              });
+            }
+          }
+        }
+        urlsChecked++;
       }
 
-      if (checks.includes('indexing')) {
-        const result = await validateIndexing(url);
-        allIssues.push(...result.issues.map(issue => ({
-          ...issue,
-          id: generateIssueId(),
-        })));
-      }
-
+      // GSC doesn't cover performance, so run performance validator if requested
       if (checks.includes('performance')) {
-        const result = await validatePerformance(url);
-        allIssues.push(...result.issues.map(issue => ({
-          ...issue,
-          id: generateIssueId(),
-        })));
+        for (const url of urlsToValidate.slice(0, maxUrls)) {
+          const result = await validatePerformance(url);
+          allIssues.push(...result.issues.map(issue => ({
+            ...issue,
+            id: generateIssueId(),
+          })));
+        }
       }
+    } else {
+      // Fallback to validators
+      for (const url of urlsToValidate.slice(0, maxUrls)) {
+        if (checks.includes('structured_data')) {
+          const result = await validateStructuredData(url);
+          allIssues.push(...result.issues.map(issue => ({
+            ...issue,
+            id: generateIssueId(),
+          })));
+        }
 
-      if (checks.includes('mobile')) {
-        const result = await validateMobile(url);
-        allIssues.push(...result.issues.map(issue => ({
-          ...issue,
-          id: generateIssueId(),
-        })));
+        if (checks.includes('indexing')) {
+          const result = await validateIndexing(url);
+          allIssues.push(...result.issues.map(issue => ({
+            ...issue,
+            id: generateIssueId(),
+          })));
+        }
+
+        if (checks.includes('performance')) {
+          const result = await validatePerformance(url);
+          allIssues.push(...result.issues.map(issue => ({
+            ...issue,
+            id: generateIssueId(),
+          })));
+        }
+
+        if (checks.includes('mobile')) {
+          const result = await validateMobile(url);
+          allIssues.push(...result.issues.map(issue => ({
+            ...issue,
+            id: generateIssueId(),
+          })));
+        }
+
+        urlsChecked++;
       }
-
-      urlsChecked++;
     }
 
     // Store issues in DynamoDB
@@ -180,6 +233,8 @@ export async function handler(
       completed_at: completedAt,
       summary,
       issues: allIssues,
+      gsc_used: gscUsed,
+      gsc_property: gscPropertyUsed,
     };
 
     return jsonResponse(200, response);

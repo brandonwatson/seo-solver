@@ -117,6 +117,10 @@ export interface ValidationRequest {
   checks?: IssueCategory[];
   max_urls?: number;
   callback_url?: string;
+  /** Use GSC as primary data source if connected */
+  use_gsc?: boolean;
+  /** Site ID for token lookup (default: 'default') */
+  site_id?: string;
 }
 
 export interface ValidationSummary {
@@ -143,6 +147,10 @@ export interface ValidationResponse {
   callback_url?: string;
   summary?: ValidationSummary;
   issues?: Issue[];
+  /** Whether GSC was used as the data source */
+  gsc_used?: boolean;
+  /** GSC property URL if different from site_url */
+  gsc_property?: string;
 }
 
 // ============================================================

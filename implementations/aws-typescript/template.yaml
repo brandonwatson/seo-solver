@@ -223,6 +223,33 @@ Resources:
         EntryPoints:
           - src/handlers/gsc-properties.ts
 
+  # GSC URL Inspection Endpoint
+  GscInspectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-gsc-inspect-${StageName}
+      Handler: handlers/gsc-inspect.handler
+      CodeUri: ./
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
+      Events:
+        GscInspectApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /gsc/inspect
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/gsc-inspect.ts
+
   # Validate Endpoint
   ValidateFunction:
     Type: AWS::Serverless::Function
@@ -237,6 +264,8 @@ Resources:
             TableName: !Ref SitesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref IssuesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TokensTable
       Events:
         ValidateApi:
           Type: HttpApi
