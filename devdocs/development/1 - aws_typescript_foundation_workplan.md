@@ -309,32 +309,55 @@ After completing this workplan:
 
 ## TRACKING SUMMARY
 
-_To be filled in after completion of work in a phase_
-
 ### Phase 1 Completed Features
 
-- TBD
+- OpenAPI 3.0 spec at `shared/api-spec.yaml`
+- JSON schemas for all entities (`shared/schemas/*.json`)
+- Test fixtures for requests, responses, and HTML pages
+- Validated with redocly and ajv-cli
 
 ### Phase 2 Completed Features
 
-- TBD
+- Full SAM template with Node.js 22.x on arm64
+- 5 Lambda handlers: health, validate, sites, issues, scheduled
+- DynamoDB tables with GSIs (seo-solver-sites-dev, seo-solver-issues-dev)
+- 4 validator modules: structured-data, indexing, performance, mobile
+- Deploy scripts (sam-deploy-sample.sh, sso-login-sample.sh)
+- Deployed to: https://q28wfj5xpc.execute-api.us-west-1.amazonaws.com/dev
+- Bug fix: PATCH endpoint path matching for stage prefix
 
 ### Phase 3 Completed Features
 
-- TBD
+- TBD (deferred - pivoting to GSC integration)
 
 ### Additional Implementations Beyond Original Tasks
 
-- TBD
+- .nvmrc for Node.js 22 version pinning
+- Redirect chain detection in indexing validator
 
 ### Deferred/Not Implemented Items
 
-- TBD
+- Phase 3 documentation polish - deferred pending GSC integration
+- CI workflow - will be added after architecture stabilizes
 
 ### Technical Notes and Learnings
 
-- TBD
+- **PIVOT:** Validators are now SECONDARY to Google Search Console API integration
+- See Workplan 2 for GSC integration as primary data source
+- Validators remain useful for:
+  - Sites without GSC connected (e.g., askmylisting.com)
+  - Proactive detection before Google catches issues
+  - Reference implementation for custom validators
+- SAM `rawPath` includes stage prefix (e.g., `/dev/issues/`) - use `includes()` not `startsWith()`
+- SAM CLI 1.151.0+ required for Node.js 22.x support
 
 ### Key Files Modified
 
-- TBD
+- `shared/api-spec.yaml` - OpenAPI specification
+- `shared/schemas/*.json` - JSON Schema definitions
+- `implementations/aws-typescript/template.yaml` - SAM infrastructure
+- `implementations/aws-typescript/src/handlers/*.ts` - Lambda handlers
+- `implementations/aws-typescript/src/validators/*.ts` - SEO validators (now secondary)
+- `implementations/aws-typescript/src/db/dynamodb.ts` - Database layer
+- `.nvmrc` - Node.js version
+- `scripts/*-sample.sh` - Deploy script templates

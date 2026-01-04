@@ -1,0 +1,326 @@
+# Workplan 2: Google Search Console Integration
+
+## Overview
+
+**Problem:** The original approach built validators that *guess* what SEO issues exist. But Google Search Console already *knows* what's wrong - it sends emails about specific issues. We should use the source.
+
+**Solution:** Integrate with Google Search Console API to:
+- Pull actual issues Google is reporting (structured data errors, indexing problems, etc.)
+- Explain those issues in plain English
+- Suggest/generate fixes
+- Fall back to our validators for sites without GSC
+
+**Why This Matters:**
+- User gets emails like "Videos structured data issues detected" with missing `uploadDate`, `thumbnailUrl`
+- Our validators didn't catch this because we only checked for JSON-LD presence, not field validation
+- GSC already did the hard work - we just need to surface it better
+
+**Constraints:**
+- Must support OAuth2 for user's GSC access (not just service accounts)
+- Must handle sites with and without GSC gracefully
+- Keep existing validators as secondary/fallback
+- Stay within GSC API limits (2,000 URL inspections/day/property)
+
+---
+
+## Implementation Strategy
+
+**Approach:** Add GSC as the primary data source, with our validators as fallback. The API response includes the source of each issue (gsc vs validator).
+
+**Key Decisions:**
+- OAuth2 flow for user authentication with Google
+- Store GSC tokens securely (encrypted in DynamoDB or SSM)
+- URL Inspection API for per-URL details
+- Search Analytics API for performance data
+- Our validators run when GSC is not connected
+
+**Architecture:**
+```
+User Request
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Is GSC connected for this site?    │
+└─────────────────────────────────────┘
+    │                    │
+    Yes                  No
+    │                    │
+    ▼                    ▼
+┌──────────────┐   ┌──────────────────┐
+│  GSC API     │   │  Our Validators  │
+│  (primary)   │   │  (fallback)      │
+└──────────────┘   └──────────────────┘
+    │                    │
+    └────────┬───────────┘
+             ▼
+    ┌─────────────────┐
+    │  Unified Issue  │
+    │  Response       │
+    │  (with source)  │
+    └─────────────────┘
+```
+
+**Dependencies:**
+- Google Cloud Project with Search Console API enabled
+- OAuth2 credentials (client ID, client secret)
+- User must grant access to their GSC properties
+
+---
+
+## Phase 1: OAuth2 & GSC Connection
+
+- **STATUS:** PENDING
+- **Goal:** Allow users to connect their Google Search Console account
+- **Estimated Effort:** Medium (2-3 sessions)
+
+### Current State:
+
+```
+implementations/aws-typescript/
+├── src/
+│   ├── handlers/        # Existing handlers
+│   └── validators/      # Our detection validators (now secondary)
+```
+
+### Target State:
+
+```
+implementations/aws-typescript/
+├── src/
+│   ├── handlers/
+│   │   ├── ... existing ...
+│   │   ├── auth-google.ts      # OAuth2 initiate/callback
+│   │   └── gsc-properties.ts   # List user's GSC properties
+│   ├── gsc/
+│   │   ├── client.ts           # GSC API client wrapper
+│   │   ├── oauth.ts            # OAuth2 token management
+│   │   └── types.ts            # GSC-specific types
+│   └── validators/             # Unchanged (secondary)
+```
+
+### Tasks:
+
+- **1.1. Google Cloud Setup Documentation:**
+    - Document: How to create GCP project
+    - Document: Enable Search Console API
+    - Document: Create OAuth2 credentials
+    - Document: Configure consent screen
+
+- **1.2. OAuth2 Flow - Initiate:**
+    - File: `src/handlers/auth-google.ts`
+    - GET /auth/google → Redirect to Google OAuth consent
+    - Include scopes: `webmasters.readonly`
+    - State parameter for CSRF protection
+    - Return URL stored in environment variable
+
+- **1.3. OAuth2 Flow - Callback:**
+    - GET /auth/google/callback → Exchange code for tokens
+    - Store refresh token securely (DynamoDB encrypted or SSM)
+    - Associate tokens with user/site
+    - Redirect to success page
+
+- **1.4. Token Management:**
+    - File: `src/gsc/oauth.ts`
+    - Refresh access token when expired
+    - Revoke tokens on disconnect
+    - Handle token errors gracefully
+
+- **1.5. List GSC Properties:**
+    - File: `src/handlers/gsc-properties.ts`
+    - GET /gsc/properties → List sites user has access to
+    - Allow user to select which property to connect
+    - Store property URL association with site
+
+- **1.6. Update SAM Template:**
+    - Add new Lambda functions for auth endpoints
+    - Add SSM parameters for OAuth credentials
+    - Add DynamoDB attributes for GSC tokens
+
+- **1.7. Verify:**
+    - Complete OAuth flow end-to-end
+    - List properties for connected account
+    - Tokens refresh correctly
+
+---
+
+## Phase 2: URL Inspection API Integration
+
+- **STATUS:** PENDING
+- **Goal:** Pull actual indexing status and issues from GSC
+- **Estimated Effort:** Medium (2-3 sessions)
+
+### Target State:
+
+```
+implementations/aws-typescript/
+├── src/
+│   ├── gsc/
+│   │   ├── client.ts
+│   │   ├── oauth.ts
+│   │   ├── types.ts
+│   │   ├── url-inspection.ts   # URL Inspection API
+│   │   └── issues-mapper.ts    # Map GSC issues to our format
+```
+
+### Tasks:
+
+- **2.1. URL Inspection Client:**
+    - File: `src/gsc/url-inspection.ts`
+    - Call `urlInspection.index.inspect` endpoint
+    - Handle rate limits (2k/day/property)
+    - Cache results to avoid redundant calls
+
+- **2.2. Issue Mapping:**
+    - File: `src/gsc/issues-mapper.ts`
+    - Map GSC index status to our issue types
+    - Map GSC rich result issues to our structured data issues
+    - Map GSC mobile usability issues to our mobile issues
+    - Preserve original GSC data in `details`
+
+- **2.3. Integrate with Validate Handler:**
+    - File: `src/handlers/validate.ts`
+    - Check if site has GSC connected
+    - If yes: Use GSC URL Inspection API as primary
+    - If no: Fall back to our validators
+    - Add `source: 'gsc' | 'validator'` to each issue
+
+- **2.4. Sitemap Parsing:**
+    - File: `src/gsc/sitemap.ts`
+    - Fetch and parse sitemap.xml
+    - Get list of URLs to inspect
+    - Respect max_urls parameter
+
+- **2.5. Batch Inspection:**
+    - Inspect multiple URLs efficiently
+    - Track daily quota usage
+    - Prioritize URLs (homepage, recent changes)
+
+- **2.6. Verify:**
+    - Connect calminterview.com via OAuth
+    - Run validation → get actual GSC issues
+    - Verify Video structured data issues appear
+    - Verify "Duplicate without canonical" appears
+
+---
+
+## Phase 3: Rich Results & Enhancement Reports
+
+- **STATUS:** PENDING
+- **Goal:** Pull structured data validation results from GSC
+- **Estimated Effort:** Medium (2-3 sessions)
+
+### Tasks:
+
+- **3.1. Research Enhancement Reports API:**
+    - Determine what's available via API vs UI-only
+    - Document any scraping alternatives if needed
+    - Identify workarounds for missing APIs
+
+- **3.2. Structured Data Issue Details:**
+    - Extract specific field errors (missing uploadDate, etc.)
+    - Map to actionable fix suggestions
+    - Include links to Google's documentation
+
+- **3.3. Fix Generation:**
+    - For each issue type, generate fix code/instructions
+    - Video schema: Generate complete JSON-LD with required fields
+    - Canonical issues: Generate correct `<link rel="canonical">` tag
+    - Make fixes copy-pasteable
+
+- **3.4. Plain English Explanations:**
+    - Create human-readable explanations for each issue
+    - Why it matters for SEO
+    - Impact on search appearance
+    - Priority level
+
+- **3.5. Verify:**
+    - All calminterview.com issues have clear explanations
+    - Fix suggestions are accurate and actionable
+    - User can understand and act on each issue
+
+---
+
+## Phase 4: Hybrid Mode & Polish
+
+- **STATUS:** PENDING
+- **Goal:** Seamless experience for sites with and without GSC
+- **Estimated Effort:** Small (1-2 sessions)
+
+### Tasks:
+
+- **4.1. Unified Response Format:**
+    - Same response structure regardless of source
+    - Clear indication of data source
+    - Consistent severity/priority mapping
+
+- **4.2. Proactive Detection:**
+    - Option to run validators even when GSC connected
+    - Catch issues before Google does
+    - Flag as "potential issues" vs "confirmed by Google"
+
+- **4.3. Connection Status Endpoint:**
+    - GET /sites/{site_id}/gsc-status
+    - Return: connected, properties available, quota remaining
+    - Help user understand their setup
+
+- **4.4. Update API Spec:**
+    - Add new endpoints to OpenAPI spec
+    - Document OAuth flow
+    - Update response schemas with `source` field
+
+- **4.5. Documentation:**
+    - How to set up GCP project
+    - How to connect GSC
+    - Troubleshooting OAuth issues
+    - Understanding GSC vs validator issues
+
+---
+
+## Expected Results
+
+After completing this workplan:
+- Users can connect their Google Search Console account
+- Validation pulls actual issues Google is reporting
+- Video structured data issues (uploadDate, thumbnailUrl) are detected
+- Duplicate without canonical issues are detected
+- Plain English explanations for each issue
+- Actionable fix suggestions
+- Fallback to validators for sites without GSC
+- calminterview.com issues match Search Console emails
+
+---
+
+## Risks & Unknowns
+
+- **Risk:** GSC API doesn't expose all Enhancement Report data - may need workarounds
+- **Risk:** OAuth flow complexity for serverless (callback URLs, state management)
+- **Risk:** 2k URL/day limit may be restrictive for large sites
+- **Unknown:** How to handle multiple GSC properties per user
+- **Unknown:** Token storage security (DynamoDB encryption vs SSM vs Secrets Manager)
+- **Mitigation:** Start with calminterview.com as test case, iterate based on real usage
+
+---
+
+## TRACKING SUMMARY
+
+_To be filled in after completion of work in a phase_
+
+### Phase 1 Completed Features
+
+- TBD
+
+### Phase 2 Completed Features
+
+- TBD
+
+### Phase 3 Completed Features
+
+- TBD
+
+### Phase 4 Completed Features
+
+- TBD
+
+### Technical Notes and Learnings
+
+- TBD
