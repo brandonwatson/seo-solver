@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SEO Solver - AWS Lambda TypeScript Implementation
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+  ApiKey:
+    Type: String
+    NoEcho: true
+    Description: API key for authentication
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        STAGE: !Ref StageName
+        SITES_TABLE: !Ref SitesTable
+        ISSUES_TABLE: !Ref IssuesTable
+
+Resources:
+  # API Gateway
+  SeoSolverApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref StageName
+      Cors:
+        AllowOrigin: "'*'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-API-Key'"
+
+  # DynamoDB Tables
+  SitesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub SEO-Sites-${StageName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+
+  IssuesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub SEO-Issues-${StageName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: detected_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: detected_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # Lambda Functions - to be implemented per workplan
+  # ValidateFunction:
+  # IssuesFunction:
+  # SitesFunction:
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub https://${SeoSolverApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  SitesTableName:
+    Value: !Ref SitesTable
+  IssuesTableName:
+    Value: !Ref IssuesTable

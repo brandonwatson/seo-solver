@@ -1,0 +1,19 @@
+# SAM CLI configuration - update with your values
+
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "seo-solver-dev"
+resolve_s3 = true
+s3_prefix = "seo-solver"
+region = "us-west-2"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "StageName=dev"
+
+[prod.deploy.parameters]
+stack_name = "seo-solver-prod"
+resolve_s3 = true
+s3_prefix = "seo-solver"
+region = "us-west-2"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "StageName=prod"

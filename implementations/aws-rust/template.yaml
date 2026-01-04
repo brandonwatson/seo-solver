@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SEO Solver - AWS Lambda Rust Implementation
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: provided.al2023
+    Architectures:
+      - arm64
+    MemorySize: 256
+    Environment:
+      Variables:
+        STAGE: !Ref StageName
+
+Resources:
+  # Lambda functions to be implemented per workplan
+
+Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
