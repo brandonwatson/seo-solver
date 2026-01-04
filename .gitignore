@@ -62,6 +62,10 @@ Cargo.lock
 *.pem
 *.key
 
+# Local scripts (contain profile-specific info)
+scripts/sso-login.sh
+scripts/sam-deploy.sh
+
 # Logs
 *.log
 npm-debug.log*
