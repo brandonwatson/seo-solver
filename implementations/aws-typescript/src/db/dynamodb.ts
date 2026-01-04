@@ -8,12 +8,14 @@ import {
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import type { Site, IssueRecord, IssueStatus, Issue } from '../types';
+import type { GoogleTokenRecord } from '../gsc/types';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
 const SITES_TABLE = process.env.SITES_TABLE!;
 const ISSUES_TABLE = process.env.ISSUES_TABLE!;
+const TOKENS_TABLE = process.env.TOKENS_TABLE!;
 
 // ============================================================
 // Sites Operations
@@ -269,4 +271,90 @@ export function issueToRecord(issue: Issue, siteId: string): IssueRecord {
     issue_id: issue.id,
     status: issue.status || 'open',
   };
+}
+
+// ============================================================
+// Google Token Operations
+// ============================================================
+
+export async function getGoogleToken(siteId: string): Promise<GoogleTokenRecord | null> {
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TOKENS_TABLE,
+      Key: { pk: `GOOGLE#${siteId}`, sk: 'TOKEN' },
+    })
+  );
+  return (result.Item as GoogleTokenRecord) || null;
+}
+
+export async function putGoogleToken(token: GoogleTokenRecord): Promise<void> {
+  await docClient.send(
+    new PutCommand({
+      TableName: TOKENS_TABLE,
+      Item: {
+        pk: `GOOGLE#${token.site_id}`,
+        sk: 'TOKEN',
+        ...token,
+      },
+    })
+  );
+}
+
+export async function deleteGoogleToken(siteId: string): Promise<void> {
+  const { DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TOKENS_TABLE,
+      Key: { pk: `GOOGLE#${siteId}`, sk: 'TOKEN' },
+    })
+  );
+}
+
+// ============================================================
+// OAuth State Token Operations (for CSRF protection)
+// ============================================================
+
+export interface StateTokenData {
+  site_id?: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export async function getStateToken(state: string): Promise<StateTokenData | null> {
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TOKENS_TABLE,
+      Key: { pk: `STATE#${state}`, sk: 'OAUTH' },
+    })
+  );
+  if (!result.Item) return null;
+  return {
+    site_id: result.Item.site_id,
+    created_at: result.Item.created_at,
+    expires_at: result.Item.expires_at,
+  };
+}
+
+export async function putStateToken(state: string, data: StateTokenData): Promise<void> {
+  await docClient.send(
+    new PutCommand({
+      TableName: TOKENS_TABLE,
+      Item: {
+        pk: `STATE#${state}`,
+        sk: 'OAUTH',
+        ...data,
+        ttl: Math.floor(new Date(data.expires_at).getTime() / 1000), // TTL for auto-cleanup
+      },
+    })
+  );
+}
+
+export async function deleteStateToken(state: string): Promise<void> {
+  const { DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TOKENS_TABLE,
+      Key: { pk: `STATE#${state}`, sk: 'OAUTH' },
+    })
+  );
 }
