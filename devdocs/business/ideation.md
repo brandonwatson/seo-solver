@@ -241,6 +241,63 @@ The `/gsc-solver` skill:
 - No ongoing maintenance burden of a SaaS
 - Learning opportunity for Go and Rust
 
+## Open Source Learning Goals
+
+This project serves a dual purpose: building useful software AND learning how to manage an open source project effectively.
+
+### Learning Objectives
+
+1. **Working in Public**
+   - Maintain a public repository with clear documentation
+   - Write issues and PRs as if strangers will read them
+   - Document decisions in ADRs or commit messages
+   - Build a changelog as features ship
+
+2. **Managing Pull Requests**
+   - Practice reviewing external contributions
+   - Learn when to use squash vs merge vs rebase
+   - Develop a voice for providing constructive feedback
+   - Establish PR templates and review guidelines
+
+3. **Community Building**
+   - Write welcoming CONTRIBUTING.md guidelines
+   - Respond to issues and PRs promptly
+   - Label issues for discoverability (good-first-issue, help-wanted)
+   - Celebrate contributors (README mentions, release notes)
+
+4. **Project Governance**
+   - Define code of conduct
+   - Establish coding standards and enforce via CI
+   - Create issue templates for bugs, features, questions
+   - Document release process
+
+### PR Management Approach
+
+For this project, adopt these conventions:
+
+| Scenario | Merge Strategy | Rationale |
+|----------|----------------|-----------|
+| Single-commit feature PRs | Squash | Clean history |
+| Multi-commit PRs with logical commits | Merge | Preserve context |
+| Contributor PRs | Squash | Simplify for contributors |
+| Dependency updates | Squash | Reduce noise |
+
+### First-Time Contributor Guidelines
+
+When someone opens their first PR:
+1. Thank them within 48 hours
+2. Provide specific, actionable feedback
+3. Offer to help if they get stuck
+4. Celebrate when merged (mention in release notes)
+
+### Success Criteria for Learning
+
+- [ ] Received and merged at least one external contribution
+- [ ] Closed a PR constructively with clear explanation
+- [ ] Used all three merge strategies appropriately
+- [ ] Maintained response time under 48 hours for PRs
+- [ ] Built a CONTRIBUTING.md that a stranger can follow
+
 ## Success Metrics
 
 ### MVP Success Criteria
