@@ -164,7 +164,7 @@ function mapIndexStatusIssues(
       severity: 'warning',
       message: 'No canonical tag specified',
       details: {
-        google_canonical: indexStatus.googleCanonical,
+        ...(indexStatus.googleCanonical ? { google_canonical: indexStatus.googleCanonical } : {}),
       },
       suggestedFix: `Add a canonical tag: <link rel="canonical" href="${url}">`,
       detectedAt: now,
@@ -299,17 +299,25 @@ interface CreateIssueParams {
 }
 
 function createIssue(params: CreateIssueParams): Issue {
+  // Filter out undefined values from details to prevent DynamoDB errors
+  const cleanDetails: Record<string, unknown> = {
+    message: params.message,
+    source: params.source,
+  };
+
+  for (const [key, value] of Object.entries(params.details)) {
+    if (value !== undefined) {
+      cleanDetails[key] = value;
+    }
+  }
+
   return {
     id: '', // Will be assigned when storing
     url: params.url,
     category: params.category,
     type: params.type,
     severity: params.severity,
-    details: {
-      message: params.message,
-      source: params.source,
-      ...params.details,
-    },
+    details: cleanDetails,
     auto_fixable: false,
     suggested_fix: params.suggestedFix,
     detected_at: params.detectedAt,
