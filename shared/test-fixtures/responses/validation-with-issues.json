@@ -1,0 +1,115 @@
+{
+  "$schema": "../../../shared/schemas/validation-response.json",
+  "_description": "Validation result with multiple issues across different categories",
+  "validation_id": "val_issues456",
+  "status": "completed",
+  "site_url": "https://www.example.com",
+  "urls_checked": 8,
+  "started_at": "2025-01-04T10:00:00Z",
+  "completed_at": "2025-01-04T10:00:15Z",
+  "summary": {
+    "total_issues": 6,
+    "errors": 3,
+    "warnings": 3,
+    "by_category": {
+      "structured_data": 3,
+      "indexing": 1,
+      "performance": 1,
+      "mobile": 1
+    }
+  },
+  "issues": [
+    {
+      "id": "iss_sd001",
+      "url": "https://www.example.com/video-page",
+      "category": "structured_data",
+      "type": "missing_required_field",
+      "severity": "error",
+      "details": {
+        "schema_type": "VideoObject",
+        "field": "uploadDate",
+        "message": "Required field 'uploadDate' is missing from VideoObject schema"
+      },
+      "auto_fixable": true,
+      "suggested_fix": "Add 'uploadDate' field with ISO 8601 date format (e.g., '2025-01-04T00:00:00Z')",
+      "detected_at": "2025-01-04T10:00:05Z"
+    },
+    {
+      "id": "iss_sd002",
+      "url": "https://www.example.com/video-page",
+      "category": "structured_data",
+      "type": "missing_required_field",
+      "severity": "error",
+      "details": {
+        "schema_type": "VideoObject",
+        "field": "thumbnailUrl",
+        "message": "Required field 'thumbnailUrl' is missing from VideoObject schema"
+      },
+      "auto_fixable": true,
+      "suggested_fix": "Add 'thumbnailUrl' field with absolute URL to video thumbnail image",
+      "detected_at": "2025-01-04T10:00:05Z"
+    },
+    {
+      "id": "iss_sd003",
+      "url": "https://www.example.com/product-page",
+      "category": "structured_data",
+      "type": "missing_recommended_field",
+      "severity": "warning",
+      "details": {
+        "schema_type": "Product",
+        "field": "aggregateRating",
+        "message": "Recommended field 'aggregateRating' is missing from Product schema"
+      },
+      "auto_fixable": true,
+      "suggested_fix": "Add 'aggregateRating' with 'ratingValue' and 'reviewCount' properties",
+      "detected_at": "2025-01-04T10:00:07Z"
+    },
+    {
+      "id": "iss_idx001",
+      "url": "https://www.example.com/blog/old-post",
+      "category": "indexing",
+      "type": "duplicate_without_canonical",
+      "severity": "error",
+      "details": {
+        "message": "Page has duplicate content but no canonical tag specified",
+        "duplicate_of": "https://www.example.com/blog/new-post"
+      },
+      "auto_fixable": true,
+      "suggested_fix": "Add <link rel=\"canonical\" href=\"https://www.example.com/blog/new-post\"> to the page head",
+      "detected_at": "2025-01-04T10:00:09Z"
+    },
+    {
+      "id": "iss_perf001",
+      "url": "https://www.example.com/gallery",
+      "category": "performance",
+      "type": "poor_lcp",
+      "severity": "warning",
+      "details": {
+        "message": "Largest Contentful Paint is too slow",
+        "threshold": 2.5,
+        "value": 3.8,
+        "unit": "seconds"
+      },
+      "auto_fixable": false,
+      "suggested_fix": "Optimize largest contentful element (likely hero image). Consider: lazy loading below-fold images, using WebP/AVIF format, adding width/height attributes, preloading critical images.",
+      "detected_at": "2025-01-04T10:00:12Z"
+    },
+    {
+      "id": "iss_mob001",
+      "url": "https://www.example.com/contact",
+      "category": "mobile",
+      "type": "tap_targets_too_close",
+      "severity": "warning",
+      "details": {
+        "message": "Interactive elements are too close together",
+        "elements": ["nav a", "footer a"],
+        "min_spacing": 48,
+        "actual_spacing": 24,
+        "unit": "pixels"
+      },
+      "auto_fixable": false,
+      "suggested_fix": "Increase spacing between tap targets to at least 48px. Add padding or margin to interactive elements.",
+      "detected_at": "2025-01-04T10:00:14Z"
+    }
+  ]
+}

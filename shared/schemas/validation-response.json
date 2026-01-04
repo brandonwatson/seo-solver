@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seo-solver.dev/schemas/validation-response.json",
+  "title": "ValidationResponse",
+  "description": "Response body from POST /validate endpoint",
+  "type": "object",
+  "required": ["validation_id", "status", "site_url", "started_at"],
+  "properties": {
+    "validation_id": {
+      "type": "string",
+      "pattern": "^val_[a-zA-Z0-9]+$",
+      "description": "Unique validation ID",
+      "examples": ["val_abc123"]
+    },
+    "status": {
+      "$ref": "#/definitions/ValidationStatus"
+    },
+    "site_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Site that was validated"
+    },
+    "urls_checked": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of URLs checked (sync response)"
+    },
+    "urls_to_check": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of URLs to check (async response)"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When validation started"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When validation completed (sync response)"
+    },
+    "estimated_completion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Estimated completion time (async response)"
+    },
+    "callback_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Webhook URL for results (async response)"
+    },
+    "summary": {
+      "$ref": "#/definitions/ValidationSummary"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Issue"
+      },
+      "description": "Detected issues (sync response)"
+    }
+  },
+  "definitions": {
+    "ValidationStatus": {
+      "type": "string",
+      "enum": ["processing", "completed", "failed"],
+      "description": "Status of the validation"
+    },
+    "ValidationSummary": {
+      "type": "object",
+      "required": ["total_issues", "errors", "warnings", "by_category"],
+      "properties": {
+        "total_issues": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "by_category": {
+          "type": "object",
+          "properties": {
+            "structured_data": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "indexing": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "performance": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mobile": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "Issue": {
+      "type": "object",
+      "required": ["id", "url", "category", "type", "severity", "auto_fixable", "detected_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^iss_[a-zA-Z0-9]+$",
+          "description": "Unique issue ID"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL where issue was detected"
+        },
+        "category": {
+          "$ref": "#/definitions/IssueCategory"
+        },
+        "type": {
+          "$ref": "#/definitions/IssueType"
+        },
+        "severity": {
+          "$ref": "#/definitions/IssueSeverity"
+        },
+        "status": {
+          "$ref": "#/definitions/IssueStatus"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "auto_fixable": {
+          "type": "boolean"
+        },
+        "suggested_fix": {
+          "type": "string"
+        },
+        "detected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "IssueCategory": {
+      "type": "string",
+      "enum": ["structured_data", "indexing", "performance", "mobile"]
+    },
+    "IssueType": {
+      "type": "string",
+      "enum": [
+        "missing_required_field",
+        "missing_recommended_field",
+        "invalid_field_value",
+        "invalid_field_type",
+        "missing_schema",
+        "syntax_error",
+        "duplicate_schema",
+        "duplicate_without_canonical",
+        "conflicting_canonical",
+        "crawled_not_indexed",
+        "discovered_not_indexed",
+        "blocked_by_robots",
+        "noindex_tag",
+        "not_found_404",
+        "server_error_5xx",
+        "redirect_chain",
+        "redirect_loop",
+        "poor_lcp",
+        "needs_improvement_lcp",
+        "poor_inp",
+        "needs_improvement_inp",
+        "poor_cls",
+        "needs_improvement_cls",
+        "no_viewport",
+        "text_too_small",
+        "tap_targets_too_close",
+        "content_wider_than_screen"
+      ]
+    },
+    "IssueSeverity": {
+      "type": "string",
+      "enum": ["error", "warning"]
+    },
+    "IssueStatus": {
+      "type": "string",
+      "enum": ["open", "fixing", "fixed", "wontfix"]
+    }
+  }
+}

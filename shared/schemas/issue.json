@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seo-solver.dev/schemas/issue.json",
+  "title": "Issue",
+  "description": "An SEO issue detected during validation",
+  "type": "object",
+  "required": ["id", "url", "category", "type", "severity", "auto_fixable", "detected_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^iss_[a-zA-Z0-9]+$",
+      "description": "Unique issue ID",
+      "examples": ["iss_xyz789"]
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL where issue was detected"
+    },
+    "category": {
+      "$ref": "#/definitions/IssueCategory"
+    },
+    "type": {
+      "$ref": "#/definitions/IssueType"
+    },
+    "severity": {
+      "$ref": "#/definitions/IssueSeverity"
+    },
+    "status": {
+      "$ref": "#/definitions/IssueStatus"
+    },
+    "details": {
+      "$ref": "#/definitions/IssueDetails"
+    },
+    "auto_fixable": {
+      "type": "boolean",
+      "description": "Whether the issue can be auto-fixed"
+    },
+    "suggested_fix": {
+      "type": "string",
+      "description": "Suggested fix for the issue"
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the issue was first detected"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the issue was last updated"
+    }
+  },
+  "definitions": {
+    "IssueCategory": {
+      "type": "string",
+      "enum": ["structured_data", "indexing", "performance", "mobile"],
+      "description": "Category of SEO issue"
+    },
+    "IssueType": {
+      "type": "string",
+      "enum": [
+        "missing_required_field",
+        "missing_recommended_field",
+        "invalid_field_value",
+        "invalid_field_type",
+        "missing_schema",
+        "syntax_error",
+        "duplicate_schema",
+        "duplicate_without_canonical",
+        "conflicting_canonical",
+        "crawled_not_indexed",
+        "discovered_not_indexed",
+        "blocked_by_robots",
+        "noindex_tag",
+        "not_found_404",
+        "server_error_5xx",
+        "redirect_chain",
+        "redirect_loop",
+        "poor_lcp",
+        "needs_improvement_lcp",
+        "poor_inp",
+        "needs_improvement_inp",
+        "poor_cls",
+        "needs_improvement_cls",
+        "no_viewport",
+        "text_too_small",
+        "tap_targets_too_close",
+        "content_wider_than_screen"
+      ],
+      "description": "Specific type of issue"
+    },
+    "IssueSeverity": {
+      "type": "string",
+      "enum": ["error", "warning"],
+      "description": "Severity level of the issue"
+    },
+    "IssueStatus": {
+      "type": "string",
+      "enum": ["open", "fixing", "fixed", "wontfix"],
+      "description": "Current status of the issue"
+    },
+    "IssueDetails": {
+      "type": "object",
+      "description": "Additional details about the issue (varies by type)",
+      "properties": {
+        "schema_type": {
+          "type": "string",
+          "description": "Schema.org type (for structured data issues)"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field name (for structured data issues)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected value or format"
+        },
+        "actual": {
+          "type": "string",
+          "description": "Actual value found"
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Threshold value (for performance issues)"
+        },
+        "value": {
+          "type": "number",
+          "description": "Measured value (for performance issues)"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

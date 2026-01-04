@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valid Structured Data Test Page</title>
+  <meta name="description" content="A test page with valid JSON-LD structured data for all common schema types.">
+  <link rel="canonical" href="https://www.example.com/valid-structured-data">
+
+  <!-- Organization Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Example Company",
+    "url": "https://www.example.com",
+    "logo": "https://www.example.com/logo.png",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+1-555-555-5555",
+      "contactType": "customer service"
+    },
+    "sameAs": [
+      "https://www.facebook.com/example",
+      "https://www.twitter.com/example"
+    ]
+  }
+  </script>
+
+  <!-- Article Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Valid Structured Data Test Article",
+    "image": [
+      "https://www.example.com/images/article-hero.jpg"
+    ],
+    "datePublished": "2025-01-04T10:00:00Z",
+    "dateModified": "2025-01-04T12:00:00Z",
+    "author": {
+      "@type": "Person",
+      "name": "Jane Doe",
+      "url": "https://www.example.com/authors/jane-doe"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Example Company",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.example.com/logo.png"
+      }
+    },
+    "description": "This is a test article with valid structured data."
+  }
+  </script>
+
+  <!-- BreadcrumbList Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.example.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Test Pages",
+        "item": "https://www.example.com/test-pages"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Valid Structured Data"
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header>
+    <nav aria-label="Breadcrumb">
+      <ol>
+        <li><a href="/">Home</a></li>
+        <li><a href="/test-pages">Test Pages</a></li>
+        <li>Valid Structured Data</li>
+      </ol>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <h1>Valid Structured Data Test Page</h1>
+      <p>This page contains valid JSON-LD structured data for testing SEO validators.</p>
+      <p>All schema.org types include their required fields with properly formatted values.</p>
+
+      <h2>Included Schema Types</h2>
+      <ul>
+        <li>Organization - with name, url, logo</li>
+        <li>Article - with headline, image, datePublished, author</li>
+        <li>BreadcrumbList - with itemListElement containing position, name, item</li>
+      </ul>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Example Company</p>
+  </footer>
+</body>
+</html>

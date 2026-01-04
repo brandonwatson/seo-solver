@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../shared/schemas/validation-request.json",
+  "_description": "Full validation request with all parameters specified",
+  "site_url": "https://www.example.com",
+  "sitemap_url": "https://www.example.com/sitemap.xml",
+  "gsc_property": "sc-domain:example.com",
+  "checks": ["structured_data", "indexing", "performance", "mobile"],
+  "max_urls": 100,
+  "callback_url": "https://webhook.example.com/seo-results"
+}

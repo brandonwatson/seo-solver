@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seo-solver.dev/schemas/site.json",
+  "title": "Site",
+  "description": "A registered site for SEO monitoring",
+  "type": "object",
+  "required": ["site_id", "site_url", "check_schedule"],
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Domain of the site (used as ID)",
+      "examples": ["example.com"]
+    },
+    "site_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Base URL of the site"
+    },
+    "sitemap_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Sitemap URL"
+    },
+    "gsc_property": {
+      "type": "string",
+      "description": "GSC property for API access",
+      "examples": ["sc-domain:example.com"]
+    },
+    "check_schedule": {
+      "$ref": "#/definitions/CheckSchedule"
+    },
+    "notification_webhook": {
+      "type": "string",
+      "format": "uri",
+      "description": "Webhook for new issue alerts"
+    },
+    "notification_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email for new issue alerts"
+    },
+    "last_check": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When the site was last checked"
+    },
+    "next_check": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the next check is scheduled"
+    },
+    "open_issues": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of open issues"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the site was registered"
+    }
+  },
+  "definitions": {
+    "CheckSchedule": {
+      "type": "string",
+      "enum": ["daily", "weekly", "manual"],
+      "default": "daily",
+      "description": "How often to run scheduled checks"
+    }
+  }
+}
