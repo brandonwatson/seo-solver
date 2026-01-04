@@ -9,85 +9,266 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-  ApiKey:
+  PageSpeedApiKey:
     Type: String
+    Default: ''
     NoEcho: true
-    Description: API key for authentication
+    Description: Google PageSpeed Insights API key (optional)
 
 Globals:
   Function:
     Timeout: 30
-    Runtime: nodejs20.x
+    Runtime: nodejs22.x
     MemorySize: 256
+    Architectures:
+      - arm64
     Environment:
       Variables:
         STAGE: !Ref StageName
         SITES_TABLE: !Ref SitesTable
         ISSUES_TABLE: !Ref IssuesTable
+        PAGESPEED_API_KEY: !Ref PageSpeedApiKey
 
 Resources:
+  # ============================================================
   # API Gateway
+  # ============================================================
   SeoSolverApi:
-    Type: AWS::Serverless::Api
+    Type: AWS::Serverless::HttpApi
     Properties:
       StageName: !Ref StageName
-      Cors:
-        AllowOrigin: "'*'"
-        AllowMethods: "'GET,POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-API-Key'"
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - X-API-Key
+        MaxAge: 300
 
+  # ============================================================
   # DynamoDB Tables
+  # ============================================================
   SitesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub SEO-Sites-${StageName}
+      TableName: !Sub seo-solver-sites-${StageName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: PK
+        - AttributeName: site_id
           AttributeType: S
       KeySchema:
-        - AttributeName: PK
+        - AttributeName: site_id
           KeyType: HASH
 
   IssuesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub SEO-Issues-${StageName}
+      TableName: !Sub seo-solver-issues-${StageName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: PK
+        - AttributeName: site_id
           AttributeType: S
-        - AttributeName: SK
+        - AttributeName: issue_id
           AttributeType: S
         - AttributeName: status
           AttributeType: S
         - AttributeName: detected_at
           AttributeType: S
       KeySchema:
-        - AttributeName: PK
+        - AttributeName: site_id
           KeyType: HASH
-        - AttributeName: SK
+        - AttributeName: issue_id
           KeyType: RANGE
       GlobalSecondaryIndexes:
         - IndexName: StatusIndex
           KeySchema:
+            - AttributeName: site_id
+              KeyType: HASH
             - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: DetectedAtIndex
+          KeySchema:
+            - AttributeName: site_id
               KeyType: HASH
             - AttributeName: detected_at
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
 
-  # Lambda Functions - to be implemented per workplan
-  # ValidateFunction:
-  # IssuesFunction:
-  # SitesFunction:
+  # ============================================================
+  # Lambda Functions
+  # ============================================================
+
+  # Health Check
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-health-${StageName}
+      Handler: handlers/health.handler
+      CodeUri: ./
+      Events:
+        HealthApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /health
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/health.ts
+
+  # Validate Endpoint
+  ValidateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-validate-${StageName}
+      Handler: handlers/validate.handler
+      CodeUri: ./
+      Timeout: 120
+      MemorySize: 512
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SitesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IssuesTable
+      Events:
+        ValidateApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /validate
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/validate.ts
+
+  # Sites Endpoints
+  SitesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-sites-${StageName}
+      Handler: handlers/sites.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SitesTable
+      Events:
+        ListSitesApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /sites
+            Method: GET
+        RegisterSiteApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /sites
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/sites.ts
+
+  # Issues Endpoints
+  IssuesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-issues-${StageName}
+      Handler: handlers/issues.handler
+      CodeUri: ./
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IssuesTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${IssuesTable.Arn}/index/*
+      Events:
+        GetIssuesApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /sites/{site_id}/issues
+            Method: GET
+        UpdateIssueApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SeoSolverApi
+            Path: /issues/{issue_id}
+            Method: PATCH
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/issues.ts
+
+  # Scheduled Validation (disabled by default)
+  ScheduledValidationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub seo-solver-scheduled-${StageName}
+      Handler: handlers/scheduled.handler
+      CodeUri: ./
+      Timeout: 300
+      MemorySize: 512
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SitesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IssuesTable
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 6 * * ? *)
+            Enabled: false
+            Description: Daily SEO validation at 6 AM UTC
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/scheduled.ts
 
 Outputs:
   ApiUrl:
     Description: API Gateway URL
     Value: !Sub https://${SeoSolverApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
   SitesTableName:
+    Description: DynamoDB Sites table name
     Value: !Ref SitesTable
   IssuesTableName:
+    Description: DynamoDB Issues table name
     Value: !Ref IssuesTable
+  HealthEndpoint:
+    Description: Health check endpoint
+    Value: !Sub https://${SeoSolverApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/health
